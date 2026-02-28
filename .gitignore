@@ -1,2 +1,5 @@
 REQUIREMENT.md
 PLAN.md
+.env
+__pycache__/
+*.pyc
