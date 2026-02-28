@@ -42,6 +42,16 @@ Outputs:
    python metrics_report.py metrics_summary.json --top 5
    ```
 
+## AI Studio Classifier
+- See `ai_studio_classifier.md` for the Agent design, deployment steps, and monitoring plan.
+- Build the classifier Agent in **AI Studio → Agent Builder**, deploy it (e.g., `risk-classifier-v1`), and copy the endpoint ID.
+- Set `CLASSIFIER_AGENT_ID` so the pipeline targets your Agent deployment:
+  ```bash
+  export CLASSIFIER_AGENT_ID="ag_xxxxx"
+  ```
+- (Optional) For direct model/prompt deployments, set `CLASSIFIER_MODEL_ID` instead.
+- Re-run `demo-run.py ... --classify` or `evaluate_run.py` to exercise the managed classifier.
+
 ## Tests
 ```bash
 python -m pytest test-scripts

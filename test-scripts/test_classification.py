@@ -17,13 +17,39 @@ class FakeChatClient:
     def __init__(self, payload: dict):
         self.payload = payload
         self.last_args = None
+        self.chat = self.Chat(self)
 
-    def chat(self, **kwargs):
-        self.last_args = kwargs
-        content = json.dumps(self.payload)
-        message = SimpleNamespace(content=content)
-        choice = SimpleNamespace(message=message)
-        return SimpleNamespace(choices=[choice])
+    class Chat:
+        def __init__(self, outer):
+            self.outer = outer
+
+        def __call__(self, **kwargs):
+            self.outer.last_args = kwargs
+            content = json.dumps(self.outer.payload)
+            message = SimpleNamespace(content=content)
+            choice = SimpleNamespace(message=message)
+            return SimpleNamespace(choices=[choice])
+
+        def complete(self, **kwargs):
+            return self.__call__(**kwargs)
+
+
+class FakeAgentClient(FakeChatClient):
+    class Agents:
+        def __init__(self, outer):
+            self.outer = outer
+
+        def complete(self, **kwargs):
+            self.outer.last_agent_args = kwargs
+            content = json.dumps(self.outer.payload)
+            message = SimpleNamespace(content=content)
+            choice = SimpleNamespace(message=message)
+            return SimpleNamespace(choices=[choice])
+
+    def __init__(self, payload: dict):
+        super().__init__(payload)
+        self.chat = self.Chat(self)
+        self.agents = self.Agents(self)
 
 
 class DocumentClassifierTests(unittest.TestCase):
@@ -62,15 +88,30 @@ class DocumentClassifierTests(unittest.TestCase):
 
     def test_invalid_json_raises(self) -> None:
         class BadClient(FakeChatClient):
-            def chat(self, **kwargs):  # type: ignore[override]
-                self.last_args = kwargs
-                message = SimpleNamespace(content="not-json")
-                choice = SimpleNamespace(message=message)
-                return SimpleNamespace(choices=[choice])
+            class Chat(FakeChatClient.Chat):
+                def __call__(self, **kwargs):
+                    self.outer.last_args = kwargs
+                    message = SimpleNamespace(content="not-json")
+                    choice = SimpleNamespace(message=message)
+                    return SimpleNamespace(choices=[choice])
 
         classifier = DocumentClassifier(client=BadClient({}))
         with self.assertRaises(ValueError):
             classifier.classify("doc-1", self.features)
+
+    def test_agent_path_invokes_agents_api(self) -> None:
+        payload = {
+            "risk_tier": "Low",
+            "rationale": "Strong liquidity",
+            "confidence": 0.9,
+        }
+        fake_client = FakeAgentClient(payload)
+        classifier = DocumentClassifier(client=fake_client, agent_id="agent-123")
+
+        result = classifier.classify("doc-2", self.features)
+
+        self.assertEqual(result.risk_tier, "Low")
+        self.assertEqual(fake_client.last_agent_args["agent_id"], "agent-123")
 
 
 if __name__ == "__main__":
