@@ -1,0 +1,2 @@
+mistralai>=1.12.4
+pytest>=9.0.0
